@@ -1,4 +1,5 @@
 ## About
+
 App that allows users to manage their playlists. Users can shuffle existing playlists, update them by replacing each song with songs by the same artist, and create new playlists with songs from specified artists.
 
 ## Local Installation
