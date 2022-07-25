@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { getArtistID, generatePlaylist } from '../spotifyAPI';
 
 const Creator = () => {

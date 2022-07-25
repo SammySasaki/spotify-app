@@ -3,7 +3,6 @@ import { getAllPlaylists, update } from '../spotifyAPI';
 import { catchErrors } from '../utils';
 import Button from 'react-bootstrap/Button';
 
-// rename css classes
 
 const Updater = () => {
     const [playlists, setPlaylists] = useState([]);

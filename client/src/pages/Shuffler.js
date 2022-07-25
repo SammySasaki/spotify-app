@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAllPlaylists, shuffle, swapTracks } from '../spotifyAPI';
+import { getAllPlaylists, shuffle } from '../spotifyAPI';
 import { catchErrors } from '../utils';
 import Button from 'react-bootstrap/Button';
 
