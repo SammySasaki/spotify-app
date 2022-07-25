@@ -37,28 +37,28 @@ const Creator = () => {
             <p>Build a playlist with your favorite artists!</p>
             
             <div>
-                <label>
-                Playlist Name:
-                <input type="text" value={playlistName} onChange={(e) => setPlaylistName(e.target.value)} />
+                <label className="Creator-text">
+                    Playlist Name:
+                    <input type="text" value={playlistName} onChange={(e) => setPlaylistName(e.target.value)} />
                 </label>
-                <label>
+                <label className="Creator-text">
                     Playlist Description:
                     <input type="text" value={playlistDesc} onChange={(e) => setPlaylistDesc(e.target.value)} />
                 </label>
             </div>
             <form onSubmit={handleSubmit}>
-                <label>
+                <label className="Creator-text">
                     Artist:
                     <input type="text" value={currArtist} onChange={(e) => setCurrArtist(e.target.value)} />
                 </label>
-                <input type="submit" value="Add" />
+                <input className="Creator-button" type="submit" value="Add" />
             </form>
             <form onSubmit={startCreation}>
-                <label>
+                <label className="Creator-text">
                     Length:
                     <input type="text" value={length} onChange={(e) => setLength(e.target.value)} />
                 </label>
-                <input type="submit" value="Generate Playlist" />
+                <input className="Creator-button" type="submit" value="Generate Playlist" />
             </form>
 
             <h1>Artists Selected</h1>

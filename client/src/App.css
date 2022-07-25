@@ -72,3 +72,12 @@
 .Artist-list {
   list-style-type: none;
 }
+
+.Creator-text {
+  margin: 0.5%;
+}
+
+.Creator-button {
+  background-color: green;
+  margin: 0.5%
+}
