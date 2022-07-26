@@ -44,7 +44,6 @@ app.get('/login', (req, res) => {
         'user-read-private',
         'user-read-email', 
         'playlist-modify-public',
-        'user-top-read'
     ].join(' ');
 
     res.redirect('https://accounts.spotify.com/authorize?'+

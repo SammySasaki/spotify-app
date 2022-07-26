@@ -26,7 +26,10 @@ const Creator = () => {
     const startCreation = async (event) => {
         event.preventDefault();
         await generatePlaylist(artistIDs, length, playlistName, playlistDesc)
-        .then(alert("done"))
+        .then(() => {
+            alert("done");
+            window.location.reload();
+        })
         .catch((error) => console.log(error));
     }
 
