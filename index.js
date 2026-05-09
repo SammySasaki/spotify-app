@@ -3,6 +3,7 @@ require('dotenv').config()
 const express = require('express');
 const axios = require('axios');
 const querystring = require('query-string');
+const Anthropic = require('@anthropic-ai/sdk');
 const app = express();
 const path = require('path');
 
@@ -10,8 +11,12 @@ const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI;
 const FRONTEND_URI = process.env.FRONTEND_URI;
+const LASTFM_API_KEY = process.env.LASTFM_API_KEY;
 const PORT = process.env.PORT || 8888;
 
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+app.use(express.json());
 app.use(express.static(path.resolve(__dirname, './client/build')));
 
 app.get('/', (req, res) => {
@@ -114,6 +119,145 @@ app.get('/refresh_token', (req, res) => {
     }).catch(error => {
         res.send(error.response.data);
     });
+});
+
+const getLastFmTags = async (name, artist) => {
+    try {
+        const trackRes = await axios.get('http://ws.audioscrobbler.com/2.0/', {
+            params: {
+                method: 'track.getTopTags',
+                track: name,
+                artist: artist,
+                api_key: LASTFM_API_KEY,
+                format: 'json',
+                autocorrect: 1,
+            }
+        });
+        const trackTags = (trackRes.data?.toptags?.tag || [])
+            .slice(0, 15)
+            .map(t => ({ name: t.name.toLowerCase().trim(), count: parseInt(t.count) || 0 }))
+            .filter(t => t.count > 0);
+
+        if (trackTags.length > 0) return trackTags;
+
+        // Fall back to artist tags when track has no data
+        const artistRes = await axios.get('http://ws.audioscrobbler.com/2.0/', {
+            params: {
+                method: 'artist.getTopTags',
+                artist: artist,
+                api_key: LASTFM_API_KEY,
+                format: 'json',
+                autocorrect: 1,
+            }
+        });
+        return (artistRes.data?.toptags?.tag || [])
+            .slice(0, 15)
+            .map(t => ({ name: t.name.toLowerCase().trim(), count: parseInt(t.count) || 0 }))
+            .filter(t => t.count > 0);
+    } catch (e) {
+        return [];
+    }
+};
+
+const getLastFmSimilar = async (seeds) => {
+    const results = [];
+    for (const seed of seeds) {
+        try {
+            const response = await axios.get('http://ws.audioscrobbler.com/2.0/', {
+                params: {
+                    method: 'track.getSimilar',
+                    track: seed.name,
+                    artist: seed.artist,
+                    api_key: LASTFM_API_KEY,
+                    format: 'json',
+                    limit: 40,
+                }
+            });
+            const tracks = response.data?.similartracks?.track || [];
+            tracks.forEach(t => results.push({
+                name: t.name,
+                artist: t.artist.name,
+                score: parseFloat(t.match),
+                source: 'lastfm',
+            }));
+        } catch (e) {
+            console.error(`Last.fm lookup failed for "${seed.name}":`, e.message);
+        }
+    }
+    return results;
+};
+
+const getClaudeSuggestions = async (seeds) => {
+    const seedList = seeds.map(s => `"${s.name}" by ${s.artist}`).join(', ');
+    const message = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1024,
+        system: 'You are a music expert. Return only valid JSON, no explanation or markdown.',
+        messages: [{
+            role: 'user',
+            content: `Given these seed tracks: ${seedList}, suggest 20 similar tracks that fans would enjoy. Prioritize lesser-known and deeper cuts over obvious hits. Return a JSON array of objects with "name" and "artist" fields only.`
+        }]
+    });
+
+    try {
+        const text = message.content[0].text;
+        const match = text.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '').match(/\[[\s\S]*\]/);
+        if (!match) return [];
+        const cleaned = match[0].replace(/\\'/g, "'").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+        const json = JSON.parse(cleaned);
+        return json.map(t => ({ name: t.name, artist: t.artist, source: 'ai', score: 0.7 }));
+    } catch (e) {
+        console.error('Failed to parse Claude suggestions:', e.message);
+        return [];
+    }
+};
+
+app.post('/api/discover', async (req, res) => {
+    const { seeds, exclude = [] } = req.body;
+    if (!seeds?.length) return res.status(400).json({ error: 'seeds required' });
+
+    try {
+        // Phase 1: candidates + seed tags in parallel
+        const [lastfmResults, claudeResults, rawSeedTags] = await Promise.all([
+            getLastFmSimilar(seeds),
+            getClaudeSuggestions(seeds),
+            Promise.all(seeds.map(s => getLastFmTags(s.name, s.artist))),
+        ]);
+
+        // Merge seed tags by summing counts across all seeds
+        const seedTagMap = {};
+        rawSeedTags.forEach(seedTags =>
+            seedTags.forEach(t => { seedTagMap[t.name] = (seedTagMap[t.name] || 0) + t.count; })
+        );
+        const seedTags = Object.entries(seedTagMap)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count);
+
+        // Deduplicate candidates, excluding seeds and already-shown tracks
+        const seen = new Set([
+            ...seeds.map(s => `${s.name}|${s.artist}`.toLowerCase()),
+            ...exclude.map(e => `${e.name}|${e.artist}`.toLowerCase()),
+        ]);
+        const unique = [];
+        for (const track of [...lastfmResults, ...claudeResults]) {
+            const key = `${track.name}|${track.artist}`.toLowerCase();
+            if (!seen.has(key)) {
+                seen.add(key);
+                unique.push(track);
+            }
+        }
+
+        // Phase 2: fetch tags for all candidates in parallel
+        const candidateTags = await Promise.all(
+            unique.map(c => getLastFmTags(c.name, c.artist))
+        );
+        const candidates = unique.map((c, i) => ({ ...c, tags: candidateTags[i] }));
+
+        res.json({ candidates, seedTags });
+    } catch (err) {
+        console.error('/api/discover error:', err.message);
+        res.status(500).json({ error: 'Discovery failed', detail: err.message });
+    }
 });
 
 // All remaining requests return the React app, so it can handle routing

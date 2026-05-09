@@ -28,7 +28,7 @@ const refreshToken = async () => {
     try {
         if (!LOCALSTORAGE_VALUES.refreshToken || 
             LOCALSTORAGE_VALUES.refreshToken === 'undefined' || 
-            (Date.now() - Number(LOCALSTORAGE_VALUES.timestamp) / 1000) < 1000
+            (Date.now() - Number(LOCALSTORAGE_VALUES.timestamp)) < 1000
         ) {
             console.error('No refresh token available');
             logout();
@@ -63,6 +63,9 @@ const getAccessToken = () => {
       [LOCALSTORAGE_KEYS.expireTime]: urlParams.get('expires_in'),
     };
     const hasError = urlParams.get('error');
+    if (queryParams[LOCALSTORAGE_KEYS.accessToken] || hasError) {
+        window.history.replaceState({}, document.title, '/');
+    }
   
     // If there's an error OR the token in localStorage has expired, refresh the token
     if (hasError || hasTokenExpired() || LOCALSTORAGE_VALUES.accessToken === 'undefined') {
@@ -90,10 +93,26 @@ const getAccessToken = () => {
 export const accessToken = getAccessToken();
 
 axios.defaults.baseURL = 'https://api.spotify.com/v1';
-axios.defaults.headers['Authorization'] = `Bearer ${accessToken}`;
-axios.defaults.headers['Content-Type'] = 'application/json';
+axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+axios.defaults.headers.common['Content-Type'] = 'application/json';
 
 export const getUserProfile = () => axios.get('/me');
+
+export const searchTracks = (query, limit = 5) =>
+    axios.get(`/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`);
+
+export const getArtistsByIds = (ids) =>
+    axios.get(`/artists?ids=${ids.join(',')}`);
+
+export const createPlaylistFromTracks = async (name, uris) => {
+    const user = await getUserProfile();
+    const playlist = await axios.post(`/users/${user.data.id}/playlists`, { name });
+    const id = playlist.data.id;
+    for (let i = 0; i < uris.length; i += 100) {
+        await axios.post(`/playlists/${id}/tracks`, { uris: uris.slice(i, i + 100) });
+    }
+    return id;
+};
 
 export const getPlaylists = (limit = 20) => {
     return axios.get(`/me/playlists?limit=${limit}`);
@@ -114,38 +133,20 @@ export const getPlaylistById = (playlist_id) => {
     return axios.get(`/playlists/${playlist_id}`);
 };
 
-// swap track #trackNum and #size (0 index)
-export const swapTracks = async (id, size, trackNum, snapshot) => {
-    const data = {
-        range_start: trackNum,
-        insert_before: size,
-        range_length: 1,
-        snapshot_id: snapshot
-    };
-    const response = await axios.put(`/playlists/${id}/tracks`, data)
-    var tempSnap = response.snapshot_id;
-    const data2 = {
-        range_start: size - 2,
-        insert_before: trackNum,
-        range_length: 1,
-        snapshot_id: tempSnap
-    };
-    return await axios.put(`/playlists/${id}/tracks`, data2);
-}
+// Fisher-Yates shuffle client-side, then replace playlist in batches of 100
+export const shuffle = async function(id) {
+    const tracks = await getAllTracks(id);
+    const uris = tracks.filter(t => t.track).map(t => t.track.uri);
 
+    for (let i = uris.length - 1; i > 0; i--) {
+        const j = rNG(i);
+        [uris[i], uris[j]] = [uris[j], uris[i]];
+    }
 
-// Fisher-Yates shuffle
-export const shuffle = async function(id, snapshot) {
-    var currSnap = snapshot;
-    const response = await getPlaylistById(id);
-    var size = response.data.tracks.total;
-    var currSize = size;
-    for (var i = 0; i < size - 1; i++) {
-      var trackNum = rNG(currSize);
-      const response2 = await swapTracks(id, currSize, trackNum, currSnap);
-      currSnap = response2.snapshot_id;
-      currSize--;
-    };
+    await axios.put(`/playlists/${id}/tracks`, { uris: uris.slice(0, 100) });
+    for (let i = 100; i < uris.length; i += 100) {
+        await axios.post(`/playlists/${id}/tracks`, { uris: uris.slice(i, i + 100) });
+    }
 }
 
 export const getAllTracks = async (id) => {
@@ -212,6 +213,13 @@ export const update = async function(id) {
     }
 }
 
+export const restorePlaylist = async (id, uris) => {
+    await axios.put(`/playlists/${id}/tracks`, { uris: uris.slice(0, 100) });
+    for (let i = 100; i < uris.length; i += 100) {
+        await axios.post(`/playlists/${id}/tracks`, { uris: uris.slice(i, i + 100) });
+    }
+};
+
 export const getArtistID = async function(name) {
     return axios.get(`search?q=${name}&type=artist`);
 }
@@ -229,19 +237,15 @@ const createEmptyPlaylist = async function(name, desc) {
 }
 
 export const generatePlaylist = async function(ids, len, name, desc) {
-    const numArtists = ids.length;
     const length = parseInt(len);
-    var counter = 0;
     const newID = await createEmptyPlaylist(name, desc);
-    for (var i = 0; i < length; i++) {
-        const artistID = ids[counter];
-        const songURI = await chooseSongFromArtist(artistID);
-        await axios.post(`/playlists/${newID}/tracks?uris=${songURI}`);
-        if (counter == numArtists - 1) {
-            counter = 0
-        } else {
-            counter++
-        };
+
+    const uris = [];
+    for (let i = 0; i < length; i++) {
+        uris.push(await chooseSongFromArtist(ids[i % ids.length]));
     }
 
+    for (let i = 0; i < uris.length; i += 100) {
+        await axios.post(`/playlists/${newID}/tracks`, { uris: uris.slice(i, i + 100) });
+    }
 }

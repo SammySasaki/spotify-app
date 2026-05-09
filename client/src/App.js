@@ -1,15 +1,13 @@
 import './App.css';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { accessToken, logout } from './spotifyAPI';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import Button from 'react-bootstrap/Button';
 import Navbar from "./Navigation/Navbar.js";
 import {
   BrowserRouter as Router,
   Routes,
   Route,
 } from "react-router-dom";
-import { Login, Home, Shuffler, Updater, Creator } from './pages';
+import { Login, Home, Shuffler, Updater, Creator, Discovery } from './pages';
 
 function App() {
   const [token, setToken] = useState(null);
@@ -18,22 +16,20 @@ function App() {
   }, []);
   return (
     <div className="App">
-      <Navbar />
+      <Router>
+        <Navbar onLogout={token ? logout : null} />
         {!token ? (
           <Login />
         ) : (
-          <>
-            <Button onClick={logout} variant="success" id="logout">Log Out</Button>
-            <Router>
-              <Routes>
-                <Route path="/shuffler" element={<Shuffler />} />
-                <Route path="/updater" element={<Updater />} />
-                <Route path="/creator" element={<Creator />} />
-                <Route path="/" element={<Home />} />
-              </Routes>
-            </Router>
-          </>
+          <Routes>
+            <Route path="/shuffler" element={<Shuffler />} />
+            <Route path="/updater" element={<Updater />} />
+            <Route path="/creator" element={<Creator />} />
+            <Route path="/discovery" element={<Discovery />} />
+            <Route path="/" element={<Home />} />
+          </Routes>
         )}
+      </Router>
     </div>
   );
 }

@@ -4,74 +4,124 @@ import { getArtistID, generatePlaylist } from '../spotifyAPI';
 const Creator = () => {
     const [playlistName, setPlaylistName] = useState('');
     const [playlistDesc, setPlaylistDesc] = useState('');
-    const [artistIDs, setArtistIDs] = useState([]);
-    const [artistNames, setArtistNames] = useState([]);
+    const [artists, setArtists] = useState([]);
     const [currArtist, setCurrArtist] = useState('');
-    const [length, setLength] = useState(0)
+    const [length, setLength] = useState('');
+    const [generating, setGenerating] = useState(false);
 
-
-    const handleSubmit = async (event) => {
+    const handleAddArtist = async (event) => {
         event.preventDefault();
+        if (!currArtist.trim()) return;
         const response = await getArtistID(currArtist);
-        const name = response.data.artists.items[0].name;
-        if (!artistNames.includes(name)) {
-            setArtistIDs(artistIDs.concat([response.data.artists.items[0].id]))
-            setArtistNames(artistNames.concat([name]))
+        const item = response.data.artists.items[0];
+        if (!item) return alert('Artist not found');
+        if (!artists.find(a => a.id === item.id)) {
+            setArtists([...artists, { id: item.id, name: item.name }]);
         } else {
-            alert("artist already added");
+            alert('Artist already added');
         }
         setCurrArtist('');
-    }
+    };
 
-    const startCreation = async (event) => {
+    const handleGenerate = async (event) => {
         event.preventDefault();
-        await generatePlaylist(artistIDs, length, playlistName, playlistDesc)
-        .then(() => {
-            alert("done");
+        setGenerating(true);
+        try {
+            await generatePlaylist(artists.map(a => a.id), length, playlistName, playlistDesc);
+            alert('done');
             window.location.reload();
-        })
-        .catch((error) => console.log(error));
-    }
-
+        } catch (error) {
+            console.log(error);
+        } finally {
+            setGenerating(false);
+        }
+    };
 
     return (
-        <>
-            <h1>Creator</h1>
-            <p>Build a playlist with your favorite artists!</p>
-            
-            <div>
-                <label className="Creator-text">
-                    Playlist Name:
-                    <input type="text" value={playlistName} onChange={(e) => setPlaylistName(e.target.value)} />
-                </label>
-                <label className="Creator-text">
-                    Playlist Description:
-                    <input type="text" value={playlistDesc} onChange={(e) => setPlaylistDesc(e.target.value)} />
-                </label>
-            </div>
-            <form onSubmit={handleSubmit}>
-                <label className="Creator-text">
-                    Artist:
-                    <input type="text" value={currArtist} onChange={(e) => setCurrArtist(e.target.value)} />
-                </label>
-                <input className="Creator-button" type="submit" value="Add" />
-            </form>
-            <form onSubmit={startCreation}>
-                <label className="Creator-text">
-                    Length:
-                    <input type="text" value={length} onChange={(e) => setLength(e.target.value)} />
-                </label>
-                <input className="Creator-button" type="submit" value="Generate Playlist" />
-            </form>
+        <div className="content">
+            <h1 className="page-title">Creator</h1>
+            <p className="page-subtitle">Build a playlist with your favorite artists</p>
+            <div className="creator-section">
+                <div className="form-block">
+                    <h2>Playlist details</h2>
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label>Name</label>
+                            <input
+                                className="form-input"
+                                type="text"
+                                value={playlistName}
+                                onChange={(e) => setPlaylistName(e.target.value)}
+                                placeholder="My playlist"
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label>Description</label>
+                            <input
+                                className="form-input"
+                                type="text"
+                                value={playlistDesc}
+                                onChange={(e) => setPlaylistDesc(e.target.value)}
+                                placeholder="Optional"
+                            />
+                        </div>
+                    </div>
+                </div>
 
-            <h1>Artists Selected</h1>
-            <ul>
-                {artistNames.map((artist, i) => (
-                    <li key={i}  className="Artist-list">{artist}</li>   
-                ))}
-            </ul>
-        </>
-    )
-}
+                <div className="form-block">
+                    <h2>Artists</h2>
+                    <form onSubmit={handleAddArtist}>
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Artist name</label>
+                                <input
+                                    className="form-input"
+                                    type="text"
+                                    value={currArtist}
+                                    onChange={(e) => setCurrArtist(e.target.value)}
+                                    placeholder="Search artist…"
+                                />
+                            </div>
+                            <button className="btn-action" type="submit">Add</button>
+                        </div>
+                    </form>
+                    {artists.length > 0 && (
+                        <ul className="artist-tags">
+                            {artists.map((a, i) => (
+                                <li key={i} className="artist-tag">{a.name}</li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+
+                <div className="form-block">
+                    <h2>Generate</h2>
+                    <form onSubmit={handleGenerate}>
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Number of tracks</label>
+                                <input
+                                    className="form-input"
+                                    type="number"
+                                    min="1"
+                                    value={length}
+                                    onChange={(e) => setLength(e.target.value)}
+                                    placeholder="20"
+                                />
+                            </div>
+                            <button
+                                className="btn-action"
+                                type="submit"
+                                disabled={generating || artists.length === 0 || !playlistName || !length}
+                            >
+                                {generating ? 'Generating…' : 'Generate'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 export default Creator;
