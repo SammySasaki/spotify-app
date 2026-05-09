@@ -266,5 +266,6 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Express app listening at http://localhost:${PORT}`);
+    const url = FRONTEND_URI || `http://127.0.0.1:${PORT}`;
+    console.log(`Express app listening at ${url}`);
 });
