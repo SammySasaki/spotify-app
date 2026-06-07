@@ -18,17 +18,13 @@ function App() {
     <div className="App">
       <Router>
         <Navbar onLogout={token ? logout : null} />
-        {!token ? (
-          <Login />
-        ) : (
-          <Routes>
-            <Route path="/shuffler" element={<Shuffler />} />
-            <Route path="/updater" element={<Updater />} />
-            <Route path="/creator" element={<Creator />} />
-            <Route path="/discovery" element={<Discovery />} />
-            <Route path="/" element={<Home />} />
-          </Routes>
-        )}
+        <Routes>
+          <Route path="/discovery" element={<Discovery />} />
+          <Route path="/shuffler" element={token ? <Shuffler /> : <Login />} />
+          <Route path="/updater" element={token ? <Updater /> : <Login />} />
+          <Route path="/creator" element={token ? <Creator /> : <Login />} />
+          <Route path="/" element={token ? <Home /> : <Login />} />
+        </Routes>
       </Router>
     </div>
   );
