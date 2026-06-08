@@ -5,16 +5,10 @@ const axios = require('axios');
 const querystring = require('query-string');
 const Anthropic = require('@anthropic-ai/sdk');
 const fs = require('fs');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const app = express();
 
-const mailer = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
-    },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 const path = require('path');
 
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -239,8 +233,8 @@ app.post('/api/request-access', (req, res) => {
     requests.push(entry);
     fs.writeFileSync(REQUESTS_FILE, JSON.stringify(requests, null, 2));
 
-    mailer.sendMail({
-        from: process.env.GMAIL_USER,
+    resend.emails.send({
+        from: 'onboarding@resend.dev',
         to: process.env.GMAIL_USER,
         subject: 'Spotify App — New Access Request',
         text: `Name: ${entry.name}\nEmail: ${entry.email}\nSubmitted: ${entry.submittedAt}`,
