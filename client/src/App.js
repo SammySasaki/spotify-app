@@ -19,7 +19,7 @@ function App() {
       <Router>
         <Navbar onLogout={token ? logout : null} />
         <Routes>
-          <Route path="/discovery" element={<Discovery />} />
+          <Route path="/discovery" element={token ? <Discovery /> : <Login />} />
           <Route path="/shuffler" element={token ? <Shuffler /> : <Login />} />
           <Route path="/updater" element={token ? <Updater /> : <Login />} />
           <Route path="/creator" element={token ? <Creator /> : <Login />} />

@@ -96,6 +96,16 @@ axios.defaults.baseURL = 'https://api.spotify.com/v1';
 axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
 axios.defaults.headers.common['Content-Type'] = 'application/json';
 
+axios.interceptors.response.use(null, error => {
+    if (error.response?.status === 403) {
+        for (const property in LOCALSTORAGE_KEYS) {
+            window.localStorage.removeItem(LOCALSTORAGE_KEYS[property]);
+        }
+        window.location = `${window.location.origin}?unauthorized=true`;
+    }
+    return Promise.reject(error);
+});
+
 export const getUserProfile = () => axios.get('/me');
 
 export const searchTracks = (query, limit = 5) =>

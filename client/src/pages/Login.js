@@ -9,6 +9,7 @@ const Login = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [status, setStatus] = useState(null);
+    const unauthorized = new URLSearchParams(window.location.search).get('unauthorized');
 
     const handleRequest = async (e) => {
         e.preventDefault();
@@ -32,6 +33,9 @@ const Login = () => {
         <div className="login-page">
             <h1>Spotify App</h1>
             <p>Manage and refresh your playlists</p>
+            {unauthorized && (
+                <p className="request-error">Your account doesn't have access yet. Request it below.</p>
+            )}
             <a className="btn-login" href={LOGIN_URI}>Log in with Spotify</a>
 
             <div className="request-access">
