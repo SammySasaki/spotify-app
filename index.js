@@ -4,7 +4,17 @@ const express = require('express');
 const axios = require('axios');
 const querystring = require('query-string');
 const Anthropic = require('@anthropic-ai/sdk');
+const fs = require('fs');
+const nodemailer = require('nodemailer');
 const app = express();
+
+const mailer = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+    },
+});
 const path = require('path');
 
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -211,6 +221,33 @@ const getClaudeSuggestions = async (seeds) => {
         return [];
     }
 };
+
+const REQUESTS_FILE = path.resolve(__dirname, 'requests.json');
+
+app.post('/api/request-access', (req, res) => {
+    const { name, email } = req.body;
+    if (!name?.trim() || !email?.trim()) {
+        return res.status(400).json({ error: 'Name and email are required' });
+    }
+
+    let requests = [];
+    if (fs.existsSync(REQUESTS_FILE)) {
+        try { requests = JSON.parse(fs.readFileSync(REQUESTS_FILE, 'utf8')); } catch {}
+    }
+
+    const entry = { name: name.trim(), email: email.trim(), submittedAt: new Date().toISOString() };
+    requests.push(entry);
+    fs.writeFileSync(REQUESTS_FILE, JSON.stringify(requests, null, 2));
+
+    mailer.sendMail({
+        from: process.env.GMAIL_USER,
+        to: process.env.GMAIL_USER,
+        subject: 'Spotify App — New Access Request',
+        text: `Name: ${entry.name}\nEmail: ${entry.email}\nSubmitted: ${entry.submittedAt}`,
+    }).catch(err => console.error('Email send failed:', err.message));
+
+    res.json({ ok: true });
+});
 
 app.post('/api/discover', async (req, res) => {
     const { seeds, exclude = [] } = req.body;
