@@ -46,11 +46,13 @@ const refreshToken = async () => {
     }
 };
 
-export const logout = () => {
+export const logout = (message) => {
     for (const property in LOCALSTORAGE_KEYS) {
         window.localStorage.removeItem(LOCALSTORAGE_KEYS[property]);
     }
-    window.location = window.location.origin
+    window.location = message
+        ? `${window.location.origin}?message=${encodeURIComponent(message)}`
+        : window.location.origin;
 }
 
 // get access token from url
@@ -98,10 +100,7 @@ axios.defaults.headers.common['Content-Type'] = 'application/json';
 
 axios.interceptors.response.use(null, error => {
     if (error.response?.status === 403) {
-        for (const property in LOCALSTORAGE_KEYS) {
-            window.localStorage.removeItem(LOCALSTORAGE_KEYS[property]);
-        }
-        window.location = `${window.location.origin}?unauthorized=true`;
+        window.dispatchEvent(new Event('spotify-unauthorized'));
     }
     return Promise.reject(error);
 });

@@ -8,12 +8,24 @@ import {
   Route,
 } from "react-router-dom";
 import { Login, Home, Shuffler, Updater, Creator, Discovery } from './pages';
+import RequestAccessForm from './components/RequestAccessForm';
 
 function App() {
   const [token, setToken] = useState(null);
+  const [showUnauthorized, setShowUnauthorized] = useState(false);
+
   useEffect(() => {
     setToken(accessToken);
+    const handleUnauthorized = () => setShowUnauthorized(true);
+    window.addEventListener('spotify-unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('spotify-unauthorized', handleUnauthorized);
   }, []);
+
+  const handleCloseUnauthorized = () => {
+    setShowUnauthorized(false);
+    logout("You've been logged out. I'll email you once your access has been approved.");
+  };
+
   return (
     <div className="App">
       <Router>
@@ -26,6 +38,18 @@ function App() {
           <Route path="/" element={token ? <Home /> : <Login />} />
         </Routes>
       </Router>
+      {showUnauthorized && (
+        <div className="modal-overlay" onClick={handleCloseUnauthorized}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>Access Required</h2>
+            <p>Your Spotify account doesn't have access to this app yet. Request access below and you'll be added soon.</p>
+            <RequestAccessForm />
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={handleCloseUnauthorized}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
